@@ -10,3 +10,9 @@
 		0x9f 0x1c
 		0x00 0x18>;
 };
+
+&soc {
+	restart@10ac000 {
+		qcom,force-warm-reboot;
+	};
+};
