@@ -61,7 +61,3 @@
 &msm_sdw_codec {
 	status = "okay";
 };
-
-&clock_audio_native {
-	status = "disabled";
-};

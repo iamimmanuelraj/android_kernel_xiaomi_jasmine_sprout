@@ -1,12 +1,11 @@
 #include "sdm660-wsa881x.dtsi"
+#include "sdm660-lpi.dtsi"
 
 &audio_apr {
 	q6core: qcom,q6core-audio {
 		compatible = "qcom,q6core-audio";
 	};
 };
-
-#include "sdm660-lpi.dtsi"
 
 &q6core {
 	int_codec: sound {
@@ -17,7 +16,7 @@
 		qcom,auxpcm-audio-intf;
 		qcom,wcn-btfm;
 		qcom,ext-disp-audio-rx;
-		qcom,msm-mi2s-master = <1>, <1>, <1>, <1>, <1>;
+		qcom,msm-mi2s-master = <1>, <1>, <1>, <1>;
 		qcom,msm-mclk-freq = <9600000>;
 		qcom,msm-mbhc-hphl-swh = <1>;
 		qcom,msm-mbhc-gnd-swh = <1>;
@@ -132,7 +131,7 @@
 		qcom,auxpcm-audio-intf;
 		qcom,wcn-btfm;
 		qcom,ext-disp-audio-rx;
-		qcom,msm-mi2s-master = <1>, <1>, <1>, <1>, <1>;
+		qcom,msm-mi2s-master = <1>, <1>, <1>, <1>;
 		qcom,audio-routing =
 			"AIF4 VI", "MCLK",
 			"RX_BIAS", "MCLK",
@@ -234,14 +233,6 @@
 				<&wsa881x_0213>, <&wsa881x_0214>;
 		qcom,wsa-aux-dev-prefix = "SpkrLeft", "SpkrRight",
 					"SpkrLeft", "SpkrRight";
-	};
-
-	wcd_rst_gpio: msm_cdc_pinctrl@64 {
-		compatible = "qcom,msm-cdc-pinctrl";
-		pinctrl-names = "aud_active", "aud_sleep";
-		pinctrl-0 = <&lpi_cdc_reset_active>;
-		pinctrl-1 = <&lpi_cdc_reset_sleep>;
-		qcom,lpi-gpios;
 	};
 };
 
@@ -411,7 +402,7 @@
 	};
 };
 
-&q6core {
+&soc {
 	cdc_pdm_gpios: cdc_pdm_pinctrl {
 		compatible = "qcom,msm-cdc-pinctrl";
 		pinctrl-names = "aud_active", "aud_sleep";
@@ -437,9 +428,7 @@
 				&cdc_dmic34_gpios_sleep>;
 		qcom,lpi-gpios;
 	};
-};
 
-&soc {
 	cdc_sdw_gpios: sdw_clk_data_pinctrl {
 	      compatible = "qcom,msm-cdc-pinctrl";
 	      pinctrl-names = "aud_active", "aud_sleep";
