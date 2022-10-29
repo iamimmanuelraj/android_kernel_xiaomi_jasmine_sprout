@@ -47,7 +47,11 @@
 #include "debug.h"
 #include "xhci.h"
 
+#ifdef CONFIG_XIAOMI
+#define SDP_CONNETION_CHECK_TIME 5000 /* in ms */
+#else
 #define SDP_CONNETION_CHECK_TIME 10000 /* in ms */
+#endif
 #define EXTCON_SYNC_EVENT_TIMEOUT_MS 1500 /* in ms */
 
 /* time out to wait for USB cable status notification (in ms)*/

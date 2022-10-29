@@ -230,6 +230,22 @@ static bool wcd_is_special_headset(struct wcd_mbhc *mbhc)
 					__func__);
 			break;
 		}
+#ifdef CONFIG_XIAOMI
+		/*Add for selfie stick not work  tangshouxing 9/6*/
+		if (mbhc->impedance_detect) {
+			mbhc->mbhc_cb->compute_impedance(mbhc,
+				&mbhc->zl, &mbhc->zr);
+			if ((mbhc->zl > 20000) && (mbhc->zr > 20000)) {
+				pr_debug("%s: Selfie stick detected\n",__func__);
+				break;
+			} else if ((mbhc->zl < 64) && (mbhc->zr > 20000)) {
+				ret = true;
+				mbhc->micbias_enable = true;
+				pr_debug("%s: Maybe special headset detected\n",__func__);
+				break;
+			}
+		}
+#endif
 	}
 	if (is_spl_hs) {
 		pr_debug("%s: Headset with threshold found\n",  __func__);
@@ -278,8 +294,8 @@ static void wcd_mbhc_update_fsm_source(struct wcd_mbhc *mbhc,
 	};
 }
 
-static void wcd_enable_mbhc_supply(struct wcd_mbhc *mbhc,
-			enum wcd_mbhc_plug_type plug_type)
+void wcd_enable_mbhc_supply(struct wcd_mbhc *mbhc,
+			    enum wcd_mbhc_plug_type plug_type)
 {
 
 	struct snd_soc_component *component = mbhc->component;
@@ -309,7 +325,11 @@ static void wcd_enable_mbhc_supply(struct wcd_mbhc *mbhc,
 				wcd_enable_curr_micbias(mbhc,
 						WCD_MBHC_EN_PULLUP);
 			} else {
+#ifdef CONFIG_XIAOMI
+				wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
+#else
 				wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
+#endif
 			}
 		} else if (plug_type == MBHC_PLUG_TYPE_HEADPHONE) {
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
@@ -432,7 +452,9 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 	struct wcd_mbhc *mbhc;
 	struct snd_soc_component *component;
 	enum wcd_mbhc_plug_type plug_type = MBHC_PLUG_TYPE_INVALID;
+#ifndef CONFIG_XIAOMI
 	unsigned long timeout;
+#endif
 	u16 hs_comp_res = 0, hphl_sch = 0, mic_sch = 0, btn_result = 0;
 	bool wrk_complete = false;
 	int pt_gnd_mic_swap_cnt = 0;
@@ -444,6 +466,9 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 	int rc, spl_hs_count = 0;
 	int cross_conn;
 	int try = 0;
+#ifdef CONFIG_XIAOMI
+	int iRetryCount;
+#endif
 
 	pr_debug("%s: enter\n", __func__);
 
@@ -518,8 +543,12 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 
 correct_plug_type:
 
+#ifdef CONFIG_XIAOMI
+	for (iRetryCount = 0; iRetryCount < 5; iRetryCount++) {
+#else
 	timeout = jiffies + msecs_to_jiffies(HS_DETECT_PLUG_TIME_MS);
 	while (!time_after(jiffies, timeout)) {
+#endif
 		if (mbhc->hs_detect_work_stop) {
 			pr_debug("%s: stop requested: %d\n", __func__,
 					mbhc->hs_detect_work_stop);
@@ -696,6 +725,9 @@ correct_plug_type:
 	    (plug_type == MBHC_PLUG_TYPE_ANC_HEADPHONE))) {
 		pr_debug("%s: plug_type:0x%x already reported\n",
 			 __func__, mbhc->current_plug);
+#ifdef CONFIG_XIAOMI
+		if (mbhc->current_plug != MBHC_PLUG_TYPE_NONE)
+#endif
 		goto enable_supply;
 	}
 
@@ -726,10 +758,31 @@ report:
 	wcd_mbhc_find_plug_and_report(mbhc, plug_type);
 	WCD_MBHC_RSC_UNLOCK(mbhc);
 enable_supply:
+#ifdef CONFIG_XIAOMI
+	WCD_MBHC_RSC_LOCK(mbhc);
+#endif
 	if (mbhc->mbhc_cb->mbhc_micbias_control)
 		wcd_mbhc_update_fsm_source(mbhc, plug_type);
+#ifdef CONFIG_XIAOMI
+	else {
+		/*Add for selfie stick not work  tangshouxing 9/6*/
+		if (mbhc->impedance_detect) {
+			mbhc->mbhc_cb->compute_impedance(mbhc,
+			&mbhc->zl, &mbhc->zr);
+				if ((mbhc->zl > 20000) && (mbhc->zr > 20000)) {
+					pr_debug("%s:Selfie stick device,need enable btn isrc ctrl",
+						 __func__);
+					wcd_enable_mbhc_supply(mbhc, MBHC_PLUG_TYPE_HEADSET);
+				} else
+					wcd_enable_mbhc_supply(mbhc, plug_type);
+		} else
+			wcd_enable_mbhc_supply(mbhc, plug_type);
+	}
+	WCD_MBHC_RSC_UNLOCK(mbhc);
+#else
 	else
 		wcd_enable_mbhc_supply(mbhc, plug_type);
+#endif
 exit:
 	if (mbhc->mbhc_cb->mbhc_micbias_control &&
 	    !mbhc->micbias_enable)
@@ -882,6 +935,17 @@ static irqreturn_t wcd_mbhc_hs_rem_irq(int irq, void *data)
 				 * extension cable is still plugged in
 				 * report it as LINEOUT device
 				 */
+#ifdef CONFIG_XIAOMI
+			if (!(hphl_sch && mic_sch)) {
+				pr_debug("%s: Maybe headset plug in,r1=%d,r2=%d\n",
+						__func__, mbhc->zr, mbhc->zl);
+				if (((mbhc->zl < 64) && (mbhc->zr < 64)) || 
+				    ((mbhc->zl < 64) && (mbhc->zr > 20000)))
+					goto exit;
+				else
+					goto report_unplug;
+			} else
+#endif
 				goto report_unplug;
 			} else {
 				if (!mic_sch) {
